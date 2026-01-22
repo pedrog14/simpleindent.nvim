@@ -2,12 +2,13 @@ local M = {}
 local cache_extmarks = {} ---@type table<string, vim.api.keyset.set_extmark[]>
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
+
 local _data = {} ---@type simpleindent.Data[]
 
 ---@param indent integer
 ---@param data   simpleindent.Data
 local get_extmarks = function(indent, data)
-  local key = indent .. ":" .. data.leftcol .. ":" .. data.shiftwidth .. ":" .. (data.breakindent and "bi" or "")
+  local key = indent .. ":" .. data.leftcol .. ":" .. data.shiftwidth .. (data.breakindent and ":bi" or "")
 
   if cache_extmarks[key] then
     return cache_extmarks[key]
