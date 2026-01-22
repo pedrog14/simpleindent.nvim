@@ -2,7 +2,6 @@ local M = {}
 local cache_extmarks = {} ---@type table<string, vim.api.keyset.set_extmark[]>
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
-
 local _data = {} ---@type simpleindent.Data[]
 
 ---@param indent integer
@@ -17,7 +16,7 @@ local get_extmarks = function(indent, data)
   cache_extmarks[key] = {}
 
   local shiftwidth = data.shiftwidth
-  indent = math.floor(indent / shiftwidth)
+  indent = math.ceil(indent / shiftwidth)
 
   for i = 1, indent do
     local col = (i - 1) * shiftwidth - data.leftcol
