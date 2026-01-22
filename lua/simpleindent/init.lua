@@ -63,8 +63,8 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
     return
   end
 
-  local top = top_row + 1
-  local bottom = bottom_row + 1
+  top_row = top_row + 1
+  bottom_row = bottom_row + 1
 
   ---@type simpleindent.Data?, integer
   local previous, changedtick = _data[winid], vim.b[bufnr].changedtick
@@ -78,8 +78,8 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   local data = {
     winid = winid,
     bufnr = bufnr,
-    top = top,
-    bottom = bottom,
+    top = top_row,
+    bottom = bottom_row,
     indent = previous and previous.indent or { [0] = 0 },
     current = winid == vim.api.nvim_get_current_win(),
     changedtick = changedtick,
@@ -94,7 +94,7 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   local cur_indent = data.indent
 
   vim.api.nvim_buf_call(bufnr, function()
-    for line = top, bottom do
+    for line = top_row, bottom_row do
       local indent = cur_indent[line]
 
       if not indent then
