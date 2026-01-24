@@ -2,7 +2,7 @@ local M = {}
 local cache_extmarks = {} ---@type table<string, vim.api.keyset.set_extmark[]>
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
-local _data = {} ---@type simpleindent.Data[]
+local _data = {} ---@type table<integer, simpleindent.Data>
 
 ---@param indent integer
 ---@param data   simpleindent.Data
@@ -48,9 +48,7 @@ local filter = function(bufnr)
     buftype[value] = true
   end
 
-  local ft, bt = vim.bo[bufnr].filetype, vim.bo[bufnr].buftype
-
-  return not (filetype[ft] or buftype[bt])
+  return filetype[vim.bo[bufnr].filetype] or buftype[vim.bo[bufnr].buftype]
 end
 
 ---@param _          "win"
@@ -59,7 +57,7 @@ end
 ---@param top_row    integer Top window row
 ---@param bottom_row integer Bottom window row
 local on_win = function(_, winid, bufnr, top_row, bottom_row)
-  if not filter(bufnr) then
+  if filter(bufnr) then
     return
   end
 
@@ -76,12 +74,8 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   ---@class simpleindent.Data
   ---@field indent table<integer, integer>
   local data = {
-    winid = winid,
-    bufnr = bufnr,
-    top = top_row,
-    bottom = bottom_row,
     indent = previous and previous.indent or { [0] = 0 },
-    current = winid == vim.api.nvim_get_current_win(),
+    bufnr = bufnr,
     changedtick = changedtick,
     leftcol = vim.api.nvim_buf_call(bufnr, vim.fn.winsaveview).leftcol, ---@type integer
     breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap,
