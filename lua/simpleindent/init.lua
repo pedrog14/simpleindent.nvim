@@ -1,8 +1,8 @@
 local M = {}
+local cache_data = {} ---@type table<integer, simpleindent.Data>
 local cache_extmarks = {} ---@type table<string, vim.api.keyset.set_extmark[]>
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
-local _data = {} ---@type table<integer, simpleindent.Data>
 
 ---@param indent integer
 ---@param data   simpleindent.Data
@@ -65,7 +65,7 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   bottom_row = bottom_row + 1
 
   ---@type simpleindent.Data?, integer
-  local previous, changedtick = _data[winid], vim.b[bufnr].changedtick
+  local previous, changedtick = cache_data[winid], vim.b[bufnr].changedtick
 
   if not (previous and previous.bufnr == bufnr and previous.changedtick == changedtick) then
     previous = nil
@@ -83,7 +83,7 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   }
 
   data.shiftwidth = data.shiftwidth == 0 and vim.bo[bufnr].tabstop or data.shiftwidth
-  _data[winid] = data
+  cache_data[winid] = data
 
   local cur_indent = data.indent
 
@@ -93,13 +93,11 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
 
       if not indent then
         local prev = vim.fn.prevnonblank(line)
-        cur_indent[prev] = cur_indent[prev] or vim.fn.indent(prev)
-        indent = cur_indent[prev]
+        indent = cur_indent[prev] or vim.fn.indent(prev)
 
         if prev ~= line then
           local next = vim.fn.nextnonblank(line)
-          cur_indent[next] = cur_indent[next] or vim.fn.indent(next)
-          indent = math.max(indent, cur_indent[next])
+          indent = math.max(indent, cur_indent[next] or vim.fn.indent(next))
         end
 
         cur_indent[line] = indent
@@ -126,9 +124,9 @@ M.setup = function(opts)
   vim.api.nvim_create_autocmd({ "WinClosed", "BufDelete", "BufWipeout" }, {
     group = augroup,
     callback = function()
-      for winid, _ in pairs(_data) do
+      for winid, _ in pairs(cache_data) do
         if not vim.api.nvim_win_is_valid(winid) then
-          _data[winid] = nil
+          cache_data[winid] = nil
         end
       end
     end,
