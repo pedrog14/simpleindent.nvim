@@ -1,6 +1,6 @@
 local M = {}
 
----@class simpleindent.Config
+---@class simpleindent.opts
 M.default = {
   filter = {
     filetype = {
@@ -19,6 +19,6 @@ M.default = {
   symbol = "▏",
 }
 
-M.opts = nil ---@type simpleindent.Config?
+M.opts = nil ---@type simpleindent.opts?
 
 return M

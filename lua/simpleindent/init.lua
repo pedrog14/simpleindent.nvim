@@ -1,11 +1,11 @@
 local M = {}
-local cache_data = {} ---@type table<integer, simpleindent.Data>
+local cache_indents = {} ---@type table<integer, simpleindent.indents_data>
 local cache_extmarks = {} ---@type table<string, vim.api.keyset.set_extmark[]>
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
 
 ---@param indent integer
----@param data   simpleindent.Data
+---@param data   simpleindent.indents_data
 local get_extmarks = function(indent, data)
   local key = indent .. ":" .. data.leftcol .. ":" .. data.shiftwidth .. (data.breakindent and ":bi" or "")
 
@@ -64,17 +64,17 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
   top_row = top_row + 1
   bottom_row = bottom_row + 1
 
-  ---@type simpleindent.Data?, integer
-  local previous, changedtick = cache_data[winid], vim.b[bufnr].changedtick
+  ---@type simpleindent.indents_data?, integer
+  local previous, changedtick = cache_indents[winid], vim.b[bufnr].changedtick
 
   if not (previous and previous.bufnr == bufnr and previous.changedtick == changedtick) then
     previous = nil
   end
 
-  ---@class simpleindent.Data
-  ---@field indent table<integer, integer>
-  local data = {
-    indent = previous and previous.indent or { [0] = 0 },
+  ---@class simpleindent.indents_data
+  ---@field indents integer[]
+  local indents_data = {
+    indents = previous and previous.indents or { [0] = 0 },
     bufnr = bufnr,
     changedtick = changedtick,
     leftcol = vim.api.nvim_buf_call(bufnr, vim.fn.winsaveview).leftcol, ---@type integer
@@ -82,37 +82,39 @@ local on_win = function(_, winid, bufnr, top_row, bottom_row)
     shiftwidth = vim.bo[bufnr].shiftwidth,
   }
 
-  data.shiftwidth = data.shiftwidth == 0 and vim.bo[bufnr].tabstop or data.shiftwidth
-  cache_data[winid] = data
+  indents_data.shiftwidth = indents_data.shiftwidth == 0 and vim.bo[bufnr].tabstop or indents_data.shiftwidth
+  cache_indents[winid] = indents_data
 
-  local cur_indent = data.indent
+  local indents = indents_data.indents
 
   vim.api.nvim_buf_call(bufnr, function()
     for line = top_row, bottom_row do
-      local indent = cur_indent[line]
+      local indent = indents[line]
 
       if not indent then
         local prev = vim.fn.prevnonblank(line)
-        indent = cur_indent[prev] or vim.fn.indent(prev)
+        indents[prev] = indents[prev] or vim.fn.indent(prev)
+        indent = indents[prev]
 
         if prev ~= line then
           local next = vim.fn.nextnonblank(line)
-          indent = math.max(indent, cur_indent[next] or vim.fn.indent(next))
+          indents[next] = indents[next] or vim.fn.indent(next)
+          indent = math.max(indent, indents[next])
         end
 
-        cur_indent[line] = indent
+        indents[line] = indent
       end
 
-      local extmarks = indent > 0 and get_extmarks(indent, data) or {}
+      local extmarks = indent > 0 and get_extmarks(indent, indents_data) or {}
 
-      for _, opts in ipairs(extmarks) do
+      for _, opts in pairs(extmarks) do
         vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, opts)
       end
     end
   end)
 end
 
----@param opts simpleindent.Config?
+---@param opts simpleindent.opts?
 M.setup = function(opts)
   config.opts = vim.tbl_deep_extend("force", config.default, opts or {})
   ns = vim.api.nvim_create_namespace("SimpleIndent")
@@ -124,9 +126,9 @@ M.setup = function(opts)
   vim.api.nvim_create_autocmd({ "WinClosed", "BufDelete", "BufWipeout" }, {
     group = augroup,
     callback = function()
-      for winid, _ in pairs(cache_data) do
+      for winid, _ in pairs(cache_indents) do
         if not vim.api.nvim_win_is_valid(winid) then
-          cache_data[winid] = nil
+          cache_indents[winid] = nil
         end
       end
     end,
@@ -136,7 +138,9 @@ M.setup = function(opts)
     group = augroup,
     pattern = "shiftwidth",
     callback = vim.schedule_wrap(function()
-      vim.cmd("redraw!")
+      for winid, _ in pairs(cache_indents) do
+        vim.api.nvim__redraw({ win = winid, valid = false, flush = false })
+      end
     end),
   })
 end
