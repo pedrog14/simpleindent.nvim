@@ -54,39 +54,41 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
   local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)")
   space = (space and space:sub(1, vim.str_utf_end(space, 1) + 1) or " "):rep(shiftwidth - 1)
 
-  for line = top_row, bot_row do
-    local indent = indents[line]
-    local previous = indent
+  vim.api.nvim_win_call(winid, function()
+    for line = top_row, bot_row do
+      local indent = indents[line]
+      local previous = indent
 
-    if not indent then
-      local prev = vim.fn.prevnonblank(line)
-      indent = indents[prev] or vim.fn.indent(prev)
+      if not indent then
+        local prev = vim.fn.prevnonblank(line)
+        indent = indents[prev] or vim.fn.indent(prev)
 
-      if prev ~= line then
-        local next = vim.fn.nextnonblank(line)
-        indent = math.max(indent, indents[next] or vim.fn.indent(next))
+        if prev ~= line then
+          local next = vim.fn.nextnonblank(line)
+          indent = math.max(indent, indents[next] or vim.fn.indent(next))
+        end
+      end
+
+      if indent ~= previous and indent > leftcol then
+        -- stylua: ignore
+        local virt_text =
+          config.opts.symbol
+            :rep(math.ceil(indent / shiftwidth), space)
+            :sub(leftcol + 1)
+
+        extmarks[line] = vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
+          id = extmarks[line],
+          virt_text = { { virt_text, "NonText" } },
+          virt_text_pos = "overlay",
+          virt_text_repeat_linebreak = breakindent,
+          hl_mode = "combine",
+          priority = 1,
+        })
+
+        indents[line] = indent
       end
     end
-
-    if indent ~= previous and indent > leftcol then
-      -- stylua: ignore
-      local virt_text =
-        config.opts.symbol
-          :rep(math.ceil(indent / shiftwidth), space)
-          :sub(leftcol + 1)
-
-      extmarks[line] = vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
-        id = extmarks[line],
-        virt_text = { { virt_text, "NonText" } },
-        virt_text_pos = "overlay",
-        virt_text_repeat_linebreak = breakindent,
-        hl_mode = "combine",
-        priority = 1,
-      })
-
-      indents[line] = indent
-    end
-  end
+  end)
 end
 
 ---@type simpleindent.cache[]
@@ -114,7 +116,12 @@ M.setup = function(opts)
       for _, winid in ipairs(vim.api.nvim_list_wins()) do
         local bufnr = vim.api.nvim_win_get_buf(winid)
         if M.cache[bufnr] then
-          vim.api.nvim__redraw({ win = winid, flush = false, valid = false })
+          M.cache[bufnr] = nil
+
+          local toprow = vim.fn.line("w0", winid) - 1
+          local botrow = vim.fn.line("w$", winid) - 1
+
+          on_win("win", winid, bufnr, toprow, botrow)
         end
       end
     end),
