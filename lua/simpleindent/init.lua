@@ -60,13 +60,11 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
 
     if not indent then
       local prev = vim.fn.prevnonblank(line)
-      indents[prev] = indents[prev] or vim.fn.indent(prev)
-      indent = indents[prev]
+      indent = indents[prev] or vim.fn.indent(prev)
 
       if prev ~= line then
         local next = vim.fn.nextnonblank(line)
-        indents[next] = indents[next] or vim.fn.indent(next)
-        indent = math.max(indent, indents[next])
+        indent = math.max(indent, indents[next] or vim.fn.indent(next))
       end
     end
 
