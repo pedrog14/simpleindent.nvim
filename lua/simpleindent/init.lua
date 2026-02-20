@@ -2,39 +2,6 @@ local M = {}
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
 
----@param indent integer
----@param data   simpleindent.indents_data
-local get_extmarks = function(indent, data)
-  local extmarks = M.cache.extmarks
-  local key = indent .. ":" .. data.leftcol .. ":" .. data.shiftwidth .. (data.breakindent and ":bi" or "")
-
-  if extmarks[key] then
-    return extmarks[key]
-  end
-
-  extmarks[key] = {}
-
-  local shiftwidth = data.shiftwidth
-  indent = math.ceil(indent / shiftwidth)
-
-  for i = 1, indent do
-    local col = (i - 1) * shiftwidth - data.leftcol
-    if col >= 0 then
-      table.insert(extmarks[key], {
-        virt_text = { { config.opts.symbol, "NonText" } },
-        virt_text_pos = "overlay",
-        virt_text_win_col = col,
-        hl_mode = "combine",
-        priority = 1,
-        ephemeral = true,
-        virt_text_repeat_linebreak = data.breakindent,
-      })
-    end
-  end
-
-  return extmarks[key]
-end
-
 local filter = function(bufnr)
   local filter = config.opts.filter
   local filetype, buftype = {}, {}
@@ -50,103 +17,107 @@ local filter = function(bufnr)
   return filetype[vim.bo[bufnr].filetype] or buftype[vim.bo[bufnr].buftype]
 end
 
----@param _          "win"
----@param winid      integer Current window id
----@param bufnr      integer Current buffer id
----@param top_row    integer Top window row
----@param bottom_row integer Bottom window row
-local on_win = function(_, winid, bufnr, top_row, bottom_row)
+---@param _      "win"
+---@param winid  integer
+---@param bufnr  integer
+---@param toprow integer?
+---@param botrow integer
+local on_win = function(_, winid, bufnr, toprow, botrow)
   if filter(bufnr) then
     return
   end
 
-  top_row = top_row + 1
-  bottom_row = bottom_row + 1
+  local top_row, bot_row = toprow + 1, botrow + 1
 
-  local indents = M.cache.indents
-  local previous, changedtick = indents[winid], vim.b[bufnr].changedtick ---@type simpleindent.indents_data?, integer
+  local breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
+  local changedtick = vim.b[bufnr].changedtick ---@type integer
+  local leftcol = vim.api.nvim_win_call(winid, vim.fn.winsaveview).leftcol ---@type integer
+  local shiftwidth = vim.bo[bufnr].shiftwidth
 
-  if not (previous and previous.bufnr == bufnr and previous.changedtick == changedtick) then
-    previous = nil
+  shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
+
+  local cache = M.cache[bufnr] ---@type simpleindent.cache
+  if not cache or cache.changedtick ~= changedtick then
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+    ---@class simpleindent.cache
+    cache = {
+      extmarks = cache and cache.extmarks or {}, ---@type integer[]
+      indents = { [0] = 0 }, ---@type integer[]
+      changedtick = changedtick,
+    }
+    M.cache[bufnr] = cache
   end
 
-  ---@class simpleindent.indents_data
-  ---@field indents integer[]
-  local data = {
-    indents = previous and previous.indents or { [0] = 0 },
-    bufnr = bufnr,
-    changedtick = changedtick,
-    leftcol = vim.api.nvim_buf_call(bufnr, vim.fn.winsaveview).leftcol, ---@type integer
-    breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap,
-    shiftwidth = vim.bo[bufnr].shiftwidth,
-  }
+  local indents = cache.indents
+  local extmarks = cache.extmarks
 
-  data.shiftwidth = data.shiftwidth == 0 and vim.bo[bufnr].tabstop or data.shiftwidth
-  indents[winid] = data
+  local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)")
+  space = (space and space:sub(1, vim.str_utf_end(space, 1) + 1) or " "):rep(shiftwidth - 1)
 
-  local cur_indents = data.indents
+  for line = top_row, bot_row do
+    local indent = indents[line]
+    local previous = indent
 
-  vim.api.nvim_buf_call(bufnr, function()
-    for line = top_row, bottom_row do
-      local indent = cur_indents[line]
+    if not indent then
+      local prev = vim.fn.prevnonblank(line)
+      indents[prev] = indents[prev] or vim.fn.indent(prev)
+      indent = indents[prev]
 
-      if not indent then
-        local prev = vim.fn.prevnonblank(line)
-        cur_indents[prev] = cur_indents[prev] or vim.fn.indent(prev)
-        indent = cur_indents[prev]
-
-        if prev ~= line then
-          local next = vim.fn.nextnonblank(line)
-          cur_indents[next] = cur_indents[next] or vim.fn.indent(next)
-          indent = math.max(indent, cur_indents[next])
-        end
-
-        cur_indents[line] = indent
-      end
-
-      local extmarks = indent > 0 and get_extmarks(indent, data) or {}
-
-      for _, opts in pairs(extmarks) do
-        vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, opts)
+      if prev ~= line then
+        local next = vim.fn.nextnonblank(line)
+        indents[next] = indents[next] or vim.fn.indent(next)
+        indent = math.max(indent, indents[next])
       end
     end
-  end)
+
+    if indent ~= previous and indent > leftcol then
+      -- stylua: ignore
+      local virt_text =
+        config.opts.symbol
+          :rep(math.ceil(indent / shiftwidth), space)
+          :sub(leftcol + 1)
+
+      extmarks[line] = vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
+        id = extmarks[line],
+        virt_text = { { virt_text, "NonText" } },
+        virt_text_pos = "overlay",
+        virt_text_repeat_linebreak = breakindent,
+        hl_mode = "combine",
+        priority = 1,
+      })
+
+      indents[line] = indent
+    end
+  end
 end
 
+---@type simpleindent.cache[]
 M.cache = {}
 
-M.cache.indents = nil ---@type table<integer, simpleindent.indents_data>
-M.cache.extmarks = nil ---@type table<string, vim.api.keyset.set_extmark[]>
-
----@param opts simpleindent.opts?
 M.setup = function(opts)
   config.opts = vim.tbl_deep_extend("force", config.default, opts or {})
-  ns = vim.api.nvim_create_namespace("SimpleIndent")
-
-  M.cache.indents = {}
-  M.cache.extmarks = {}
-
-  local augroup = vim.api.nvim_create_augroup("SimpleIndent", { clear = true })
+  ns = vim.api.nvim_create_namespace("simpleindent")
 
   vim.api.nvim_set_decoration_provider(ns, { on_win = on_win })
 
-  vim.api.nvim_create_autocmd({ "WinClosed", "BufDelete", "BufWipeout" }, {
+  local augroup = vim.api.nvim_create_augroup("simpleindent", { clear = true })
+
+  vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
     group = augroup,
-    callback = function()
-      for winid, _ in pairs(M.cache.indents) do
-        if not vim.api.nvim_win_is_valid(winid) then
-          M.cache.indents[winid] = nil
-        end
-      end
+    callback = function(args)
+      M.cache[args.buf] = nil
     end,
   })
 
   vim.api.nvim_create_autocmd("OptionSet", {
     group = augroup,
-    pattern = "shiftwidth",
+    pattern = { "shiftwidth", "listchars", "tabstop", "breakindent" },
     callback = vim.schedule_wrap(function()
-      for winid, _ in pairs(M.cache.indents) do
-        vim.api.nvim__redraw({ win = winid, valid = false, flush = false })
+      for _, winid in ipairs(vim.api.nvim_list_wins()) do
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        if M.cache[bufnr] then
+          vim.api.nvim__redraw({ win = winid, flush = false, valid = false })
+        end
       end
     end),
   })
