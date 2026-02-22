@@ -2,6 +2,7 @@ local M = {}
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
 
+---@param bufnr integer
 local filter = function(bufnr)
   local filter = config.opts.filter
   local filetype, buftype = {}, {}
@@ -20,8 +21,8 @@ end
 ---@param _      "win"
 ---@param winid  integer
 ---@param bufnr  integer
----@param toprow integer?
----@param botrow integer?
+---@param toprow integer
+---@param botrow integer
 local on_win = function(_, winid, bufnr, toprow, botrow)
   if filter(bufnr) then
     return
@@ -99,12 +100,13 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
   end)
 end
 
----@type simpleindent.cache[]
-M.cache = {}
+M.cache = nil ---@type simpleindent.cache[]
 
+---@param opts simpleindent.opts?
 M.setup = function(opts)
   config.opts = vim.tbl_deep_extend("force", config.default, opts or {})
   ns = vim.api.nvim_create_namespace("simpleindent")
+  M.cache = {}
 
   vim.api.nvim_set_decoration_provider(ns, { on_win = on_win })
 
