@@ -21,71 +21,79 @@ end
 ---@param winid  integer
 ---@param bufnr  integer
 ---@param toprow integer?
----@param botrow integer
+---@param botrow integer?
 local on_win = function(_, winid, bufnr, toprow, botrow)
   if filter(bufnr) then
     return
   end
 
   local top_row, bot_row = toprow + 1, botrow + 1
-
-  local breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
-  local changedtick = vim.b[bufnr].changedtick ---@type integer
-  local leftcol = vim.api.nvim_win_call(winid, vim.fn.winsaveview).leftcol ---@type integer
-  local shiftwidth = vim.bo[bufnr].shiftwidth
-
-  shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
-
   local cache = M.cache[bufnr] ---@type simpleindent.cache
-  if not cache or cache.changedtick ~= changedtick then
-    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+
+  local changedtick = vim.b[bufnr].changedtick ---@type integer
+
+  if not cache or changedtick ~= cache.changedtick then
     ---@class simpleindent.cache
     cache = {
-      extmarks = cache and cache.extmarks or {}, ---@type integer[]
       indents = { [0] = 0 }, ---@type integer[]
+      virt_texts = cache and cache.virt_texts or {}, ---@type string[]
       changedtick = changedtick,
     }
+
     M.cache[bufnr] = cache
   end
 
-  local indents = cache.indents
-  local extmarks = cache.extmarks
+  local breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
+  local leftcol = vim.api.nvim_win_call(winid, vim.fn.winsaveview).leftcol ---@type integer
+  local shiftwidth = vim.bo[bufnr].shiftwidth
+  shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
 
-  local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)")
-  space = (space and space:sub(1, vim.str_utf_end(space, 1) + 1) or " "):rep(shiftwidth - 1)
+  local symbol = config.opts.symbol
+  local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)") or " "
+  local space_rep = space:rep(shiftwidth - 1)
+
+  local indents = cache.indents
+  local virt_texts = cache.virt_texts
 
   vim.api.nvim_win_call(winid, function()
     for line = top_row, bot_row do
       local indent = indents[line]
-      local previous = indent
 
       if not indent then
         local prev = vim.fn.prevnonblank(line)
-        indent = indents[prev] or vim.fn.indent(prev)
+        indents[prev] = indents[prev] or vim.fn.indent(prev)
+        indent = indents[prev]
 
         if prev ~= line then
           local next = vim.fn.nextnonblank(line)
-          indent = math.max(indent, indents[next] or vim.fn.indent(next))
+          indents[next] = indents[next] or vim.fn.indent(next)
+          indent = math.max(indent, indents[next])
         end
+
+        indents[line] = indent
       end
 
-      if indent ~= previous and indent > leftcol then
-        -- stylua: ignore
-        local virt_text =
-          config.opts.symbol
-            :rep(math.ceil(indent / shiftwidth), space)
-            :sub(leftcol + 1)
+      if indent > leftcol then
+        local virt_text = virt_texts[indent]
+        if not virt_text then
+          virt_text = symbol:rep(math.ceil(indent / shiftwidth), space_rep)
+          virt_texts[indent] = virt_text
+        end
 
-        extmarks[line] = vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
-          id = extmarks[line],
+        if leftcol > 0 then
+          local offset = vim.str_byteindex(virt_text, "utf-32", leftcol)
+          virt_text = virt_text:sub(offset + 1)
+        end
+
+        vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
           virt_text = { { virt_text, "NonText" } },
           virt_text_pos = "overlay",
           virt_text_repeat_linebreak = breakindent,
+          virt_text_win_col = 0,
           hl_mode = "combine",
           priority = 1,
+          ephemeral = true,
         })
-
-        indents[line] = indent
       end
     end
   end)
@@ -113,16 +121,9 @@ M.setup = function(opts)
     group = augroup,
     pattern = { "shiftwidth", "listchars", "tabstop", "breakindent" },
     callback = vim.schedule_wrap(function()
-      for _, winid in ipairs(vim.api.nvim_list_wins()) do
-        local bufnr = vim.api.nvim_win_get_buf(winid)
-        if M.cache[bufnr] then
-          M.cache[bufnr] = nil
-
-          local toprow = vim.fn.line("w0", winid) - 1
-          local botrow = vim.fn.line("w$", winid) - 1
-
-          on_win("win", winid, bufnr, toprow, botrow)
-        end
+      for bufnr, cache in pairs(M.cache) do
+        cache.virt_texts = {}
+        vim.api.nvim__redraw({ buf = bufnr, flush = false, valid = false })
       end
     end),
   })
