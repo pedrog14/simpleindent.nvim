@@ -37,10 +37,9 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     ---@class simpleindent.cache
     cache = {
       indents = { [0] = 0 }, ---@type integer[]
-      virt_texts = cache and cache.virt_texts or {}, ---@type string[]
+      virt_texts = {}, ---@type string[]
       changedtick = changedtick,
     }
-
     M.cache[bufnr] = cache
   end
 
