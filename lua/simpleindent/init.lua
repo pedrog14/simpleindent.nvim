@@ -30,7 +30,6 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
 
   local top_row, bot_row = toprow + 1, botrow + 1
   local cache = M.cache[bufnr] ---@type simpleindent.cache
-
   local changedtick = vim.b[bufnr].changedtick ---@type integer
 
   if not cache or changedtick ~= cache.changedtick then
@@ -44,18 +43,17 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
   end
 
   local breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
-  local leftcol = vim.api.nvim_win_call(winid, vim.fn.winsaveview).leftcol ---@type integer
   local shiftwidth = vim.bo[bufnr].shiftwidth
   shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
 
   local symbol = config.opts.symbol
   local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)") or " "
-  local space_rep = space:rep(shiftwidth - 1)
-
-  local indents = cache.indents
-  local virt_texts = cache.virt_texts
+  space = space:rep(shiftwidth - 1)
 
   vim.api.nvim_win_call(winid, function()
+    local indents = cache.indents
+    local leftcol = vim.fn.winsaveview().leftcol
+
     for line = top_row, bot_row do
       local indent = indents[line]
 
@@ -74,10 +72,14 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
       end
 
       if indent > leftcol then
-        local virt_text = virt_texts[indent]
+        local virt_texts = cache.virt_texts
+        local col_count = math.ceil(indent / shiftwidth)
+
+        local virt_text = virt_texts[col_count]
+
         if not virt_text then
-          virt_text = symbol:rep(math.ceil(indent / shiftwidth), space_rep)
-          virt_texts[indent] = virt_text
+          virt_text = symbol:rep(col_count, space)
+          virt_texts[col_count] = virt_text
         end
 
         if leftcol > 0 then
