@@ -83,7 +83,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
         end
 
         if leftcol > 0 then
-          local offset = vim.str_byteindex(virt_text, "utf-32", leftcol)
+          local offset = vim.str_byteindex(virt_text .. space, "utf-32", leftcol)
           virt_text = virt_text:sub(offset + 1)
         end
 
