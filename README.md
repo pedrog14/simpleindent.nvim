@@ -1,6 +1,6 @@
 # simpleindent.nvim
 
-Simple indentation guides, heavily inspired by [mini.indentscope](https://github.com/nvim-mini/mini.indentscope) and [snacks.indent](https://github.com/folke/snacks.nvim/blob/main/docs/indent.md)
+Simple indentation guides, heavily inspired by [mini.indentscope](https://github.com/nvim-mini/mini.indentscope) and [snacks.indent](https://github.com/folke/snacks.nvim/blob/main/docs/indent.md).
 
 <img width="1920" height="1080" alt="Indent guides (sw=2)" src="https://github.com/user-attachments/assets/4da80472-8c98-4cb2-99bb-1976d52f7b94" />
 
