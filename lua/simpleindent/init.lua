@@ -47,7 +47,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
   shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
 
   local symbol = config.opts.symbol
-  local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:([^,]*)") or " "
+  local space = (vim.wo[winid].listchars or vim.o.listchars):match("space:(.?)") or " "
   space = space:rep(shiftwidth - 1)
 
   vim.api.nvim_win_call(winid, function()
