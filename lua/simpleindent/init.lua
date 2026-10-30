@@ -45,101 +45,99 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     M.cache[bufnr] = cache
   end
 
-  cache.benchmark = require("utils.testing").benchmark(function()
-    local opt = cache.opt
+  local opt = cache.opt
 
-    local breakindent = opt.breakindent
-    local shiftwidth = opt.shiftwidth
-    local space = opt.space
-    local symbol = config.opts.symbol
+  local breakindent = opt.breakindent
+  local shiftwidth = opt.shiftwidth
+  local space = opt.space
+  local symbol = config.opts.symbol
 
-    if not breakindent then
-      breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
-      opt.breakindent = breakindent
-    end
-    if not shiftwidth then
-      shiftwidth = vim.bo[bufnr].shiftwidth
-      shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
-      opt.shiftwidth = shiftwidth
-      space = nil -- Update space when shiftwidth is modified
-    end
-    if not space then
-      space = (vim.wo[winid].listchars or vim.o.listchars):match("space:(.?)") or " "
-      space = space:rep(shiftwidth - 1)
-      opt.space = space
-    end
+  if not breakindent then
+    breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
+    opt.breakindent = breakindent
+  end
+  if not shiftwidth then
+    shiftwidth = vim.bo[bufnr].shiftwidth
+    shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
+    opt.shiftwidth = shiftwidth
+    space = nil -- Update space when shiftwidth is modified
+  end
+  if not space then
+    space = (vim.wo[winid].listchars or vim.o.listchars):match("space:(.?)") or " "
+    space = space:rep(shiftwidth - 1)
+    opt.space = space
+  end
 
-    vim.api.nvim_win_call(winid, function()
-      local indents = cache.indents
-      local leftcol = vim.fn.winsaveview().leftcol
+  vim.api.nvim_win_call(winid, function()
+    local indents = cache.indents
+    local leftcol = vim.fn.winsaveview().leftcol
 
-      for line = top_row, bot_row do
-        local indent = indents[line]
+    for line = top_row, bot_row do
+      local indent = indents[line]
 
-        if not indent then
-          local prev = vim.fn.prevnonblank(line)
-          indents[prev] = indents[prev] or vim.fn.indent(prev)
-          indent = indents[prev]
+      if not indent then
+        local prev = vim.fn.prevnonblank(line)
+        indents[prev] = indents[prev] or vim.fn.indent(prev)
+        indent = indents[prev]
 
-          if prev ~= line then
-            local next = vim.fn.nextnonblank(line)
-            indents[next] = indents[next] or vim.fn.indent(next)
-            indent = math.max(indent, indents[next])
-          end
-
-          indents[line] = indent
+        if prev ~= line then
+          local next = vim.fn.nextnonblank(line)
+          indents[next] = indents[next] or vim.fn.indent(next)
+          indent = math.max(indent, indents[next])
         end
 
-        if indent > leftcol then
-          local virt_texts = cache.virt_texts
-          local col_count = math.ceil(indent / shiftwidth)
-          local virt_text = virt_texts[col_count]
-
-          if not virt_text then
-            virt_text = {}
-
-            local vt_dict = {
-              { space, "Whitespace" },
-              { symbol, "NonText" },
-            }
-
-            for i = 1, 2 * col_count - 1 do
-              virt_text[i] = vt_dict[(i % 2) + 1]
-            end
-
-            virt_texts[col_count] = virt_text
-          end
-
-          if leftcol > 0 then
-            local vt = {}
-            local delta = math.ceil((leftcol % shiftwidth) / shiftwidth) + 2 * math.ceil((leftcol + 1) / shiftwidth) - 1
-
-            for i = delta, #virt_text do
-              local aux = virt_text[i]
-
-              if i == delta and shiftwidth > 2 and leftcol % shiftwidth >= 2 then
-                local offset = vim.str_byteindex(space, "utf-32", (leftcol % shiftwidth) - 1)
-                aux = { space:sub(offset + 1), "Whitespace" }
-              end
-
-              vt[i - delta + 1] = aux
-            end
-
-            virt_text = vt
-          end
-
-          vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
-            virt_text = virt_text,
-            virt_text_pos = "overlay",
-            virt_text_repeat_linebreak = breakindent,
-            virt_text_win_col = 0,
-            hl_mode = "combine",
-            priority = 1,
-            ephemeral = true,
-          })
-        end
+        indents[line] = indent
       end
-    end)
+
+      if indent > leftcol then
+        local virt_texts = cache.virt_texts
+        local col_count = math.ceil(indent / shiftwidth)
+        local virt_text = virt_texts[col_count]
+
+        if not virt_text then
+          virt_text = {}
+
+          local vt_dict = {
+            { space, "Whitespace" },
+            { symbol, "NonText" },
+          }
+
+          for i = 1, 2 * col_count - 1 do
+            virt_text[i] = vt_dict[(i % 2) + 1]
+          end
+
+          virt_texts[col_count] = virt_text
+        end
+
+        if leftcol > 0 then
+          local vt = {}
+          local delta = math.ceil((leftcol % shiftwidth) / shiftwidth) + 2 * math.ceil((leftcol + 1) / shiftwidth) - 1
+
+          for i = delta, #virt_text do
+            local aux = virt_text[i]
+
+            if i == delta and shiftwidth > 2 and leftcol % shiftwidth >= 2 then
+              local offset = vim.str_byteindex(space, "utf-32", (leftcol % shiftwidth) - 1)
+              aux = { space:sub(offset + 1), "Whitespace" }
+            end
+
+            vt[i - delta + 1] = aux
+          end
+
+          virt_text = vt
+        end
+
+        vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
+          virt_text = virt_text,
+          virt_text_pos = "overlay",
+          virt_text_repeat_linebreak = breakindent,
+          virt_text_win_col = 0,
+          hl_mode = "combine",
+          priority = 1,
+          ephemeral = true,
+        })
+      end
+    end
   end)
 end
 
