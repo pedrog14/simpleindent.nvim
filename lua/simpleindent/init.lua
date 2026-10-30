@@ -36,7 +36,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     ---@class simpleindent.cache
     cache = {
       indents = { [0] = 0 }, ---@type integer[]
-      virt_texts = {}, ---@type string[]
+      virt_texts = {}, ---@type {[1]: string, [2]: string}[][]
       changedtick = changedtick,
     }
     M.cache[bufnr] = cache
@@ -74,21 +74,38 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
       if indent > leftcol then
         local virt_texts = cache.virt_texts
         local col_count = math.ceil(indent / shiftwidth)
-
         local virt_text = virt_texts[col_count]
 
         if not virt_text then
-          virt_text = symbol:rep(col_count, space)
+          virt_text = {}
+
+          for i = 1, 2 * col_count - 1 do
+            virt_text[i] = i % 2 == 1 and { symbol, "NonText" } or { space, "Whitespace" }
+          end
+
           virt_texts[col_count] = virt_text
         end
 
         if leftcol > 0 then
-          local offset = vim.str_byteindex(virt_text .. space, "utf-32", leftcol)
-          virt_text = virt_text:sub(offset + 1)
+          local vt = {}
+          local delta = math.ceil((leftcol % shiftwidth) / shiftwidth) + 2 * math.ceil((leftcol + 1) / shiftwidth) - 1
+
+          for i = delta, #virt_text do
+            local aux = virt_text[i]
+
+            if i == delta and shiftwidth > 2 and leftcol % shiftwidth >= 2 then
+              local offset = vim.str_byteindex(space, "utf-32", (leftcol % shiftwidth) - 1)
+              aux = { space:sub(offset + 1), "Whitespace" }
+            end
+
+            vt[i - delta + 1] = aux
+          end
+
+          virt_text = vt
         end
 
         vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
-          virt_text = { { virt_text, "NonText" } },
+          virt_text = virt_text,
           virt_text_pos = "overlay",
           virt_text_repeat_linebreak = breakindent,
           virt_text_win_col = 0,
