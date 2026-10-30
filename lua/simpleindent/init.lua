@@ -66,6 +66,8 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     space = (vim.wo[winid].listchars or vim.o.listchars):match("space:(.?)") or " "
     space = space:rep(shiftwidth - 1)
     opt.space = space
+
+    cache.virt_texts = {}
   end
 
   vim.api.nvim_win_call(winid, function()
@@ -174,12 +176,7 @@ M.setup = function(opts)
       local match = opt_dict[args.match]
 
       for bufnr, cache in pairs(M.cache) do
-        -- Clear cached virtual text if any modification is needed
-        if match == "shiftwidth" or match == "space" then
-          cache.virt_texts = {}
-        end
         cache.opt[match] = nil
-
         vim.api.nvim__redraw({ buf = bufnr, flush = false, valid = false })
       end
     end),
