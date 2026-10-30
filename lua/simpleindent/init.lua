@@ -63,7 +63,8 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     space = nil -- Update space when shiftwidth is modified
   end
   if not space then
-    space = (vim.wo[winid].listchars or vim.o.listchars):match("space:(.?)") or " "
+    space = vim.wo[winid].listchars or vim.o.listchars
+    space = space:match("space:([^,]+)") or space:match("space:(,)") or " "
     space = space:rep(shiftwidth - 1)
     opt.space = space
 
