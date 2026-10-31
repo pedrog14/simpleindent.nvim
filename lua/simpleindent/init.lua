@@ -124,7 +124,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
               aux = { space:sub(offset + 1), "Whitespace" }
             end
 
-            vt[i - delta + 1] = aux
+            vt[#vt + 1] = aux
           end
 
           virt_text = vt
