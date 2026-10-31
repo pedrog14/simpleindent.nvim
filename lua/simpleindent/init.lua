@@ -38,14 +38,15 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
       indents = { [0] = 0 }, ---@type integer[]
       changedtick = changedtick,
 
-      virt_texts = cache and cache.virt_texts or {}, ---@type {[1]: string, [2]: string}[][]
       opt = cache and cache.opt or {}, ---@type table<string, any>
+      virt_texts = cache and cache.virt_texts, ---@type { [integer]:{ [1]: string, [2]: string }[], dict: table }
     }
 
     M.cache[bufnr] = cache
   end
 
   local opt = cache.opt
+  local virt_texts = cache.virt_texts
 
   local breakindent = opt.breakindent
   local shiftwidth = opt.shiftwidth
@@ -60,15 +61,21 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     shiftwidth = vim.bo[bufnr].shiftwidth
     shiftwidth = shiftwidth > 0 and shiftwidth or vim.bo[bufnr].tabstop
     opt.shiftwidth = shiftwidth
-    space = nil -- Update space when shiftwidth is modified
+
+    space = nil -- Update space if shiftwidth is modified
   end
   if not space then
     space = vim.wo[winid].listchars or vim.o.listchars
     space = space:match("space:([^,]+)") or space:match("space:(,)") or " "
-    space = space:rep(shiftwidth - 1)
     opt.space = space
 
-    cache.virt_texts = {}
+    virt_texts = {
+      dict = {
+        { space:rep(shiftwidth - 1), "Whitespace" },
+        { symbol, "NonText" },
+      },
+    }
+    cache.virt_texts = virt_texts
   end
 
   vim.api.nvim_win_call(winid, function()
@@ -93,17 +100,12 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
       end
 
       if indent > leftcol then
-        local virt_texts = cache.virt_texts
         local col_count = math.ceil(indent / shiftwidth)
         local virt_text = virt_texts[col_count]
 
         if not virt_text then
+          local vt_dict = virt_texts.dict
           virt_text = {}
-
-          local vt_dict = {
-            { space, "Whitespace" },
-            { symbol, "NonText" },
-          }
 
           for i = 1, 2 * col_count - 1 do
             virt_text[i] = vt_dict[(i % 2) + 1]
