@@ -122,8 +122,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
             local aux = virt_text[i]
 
             if i == delta and shiftwidth > 2 and leftcol % shiftwidth >= 2 then
-              local offset = vim.str_byteindex(space, "utf-32", (leftcol % shiftwidth) - 1)
-              aux = { space:sub(offset + 1), "Whitespace" }
+              aux = { space:rep(shiftwidth - (leftcol % shiftwidth)), "Whitespace" }
             end
 
             vt[#vt + 1] = aux
