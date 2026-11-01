@@ -116,13 +116,14 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
 
         if leftcol > 0 then
           local vt = {}
-          local delta = math.ceil((leftcol % shiftwidth) / shiftwidth) + 2 * math.ceil((leftcol + 1) / shiftwidth) - 1
+          local mod = leftcol % shiftwidth
+          local delta = math.ceil(mod / shiftwidth) + 2 * math.ceil((leftcol + 1) / shiftwidth) - 1
 
           for i = delta, #virt_text do
             local aux = virt_text[i]
 
-            if i == delta and shiftwidth > 2 and leftcol % shiftwidth >= 2 then
-              aux = { space:rep(shiftwidth - (leftcol % shiftwidth)), "Whitespace" }
+            if i == delta and mod >= 2 then
+              aux = { space:rep(shiftwidth - mod), "Whitespace" }
             end
 
             vt[#vt + 1] = aux
