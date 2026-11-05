@@ -28,7 +28,6 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     return
   end
 
-  local top_row, bot_row = toprow + 1, botrow + 1
   local cache = M.cache[bufnr] ---@type simpleindent.cache
   local changedtick = vim.b[bufnr].changedtick ---@type integer
 
@@ -51,7 +50,6 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
   local breakindent = opt.breakindent
   local shiftwidth = opt.shiftwidth
   local space = opt.space
-  local symbol = config.opts.symbol
 
   if not breakindent then
     breakindent = vim.wo[winid].breakindent and vim.wo[winid].wrap
@@ -72,7 +70,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     virt_texts = {
       dict = {
         { space:rep(shiftwidth - 1), "Whitespace" },
-        { symbol, "NonText" },
+        { config.opts.symbol, "NonText" },
       },
     }
     cache.virt_texts = virt_texts
@@ -82,7 +80,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
     local indents = cache.indents
     local leftcol = vim.fn.winsaveview().leftcol
 
-    for line = top_row, bot_row do
+    for line = toprow + 1, botrow + 1 do
       local indent = indents[line]
 
       if not indent then
