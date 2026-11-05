@@ -97,7 +97,7 @@ local on_win = function(_, winid, bufnr, toprow, botrow)
         indents[line] = indent
       end
 
-      if indent > leftcol then
+      if shiftwidth * math.floor((indent - 1) / shiftwidth) >= leftcol then
         local col_count = math.ceil(indent / shiftwidth)
         local virt_text = virt_texts[col_count]
 
