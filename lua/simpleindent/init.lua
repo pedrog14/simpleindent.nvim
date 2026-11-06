@@ -2,10 +2,36 @@ local M = {}
 local config = require("simpleindent.config")
 local ns = nil ---@type integer
 
+---@param opts simpleindent.opts?
+local setup_opts = function(opts)
+  opts = opts or {}
+
+  local default = config.default
+  local _filter = { buftype = {}, filetype = {} }
+
+  for _, value in ipairs(default.filter.buftype) do
+    _filter.buftype[#_filter.buftype + 1] = value
+  end
+  for _, value in ipairs(opts.filter.buftype) do
+    _filter.buftype[#_filter.buftype + 1] = value
+  end
+
+  for _, value in ipairs(default.filter.filetype) do
+    _filter.filetype[#_filter.filetype + 1] = value
+  end
+  for _, value in ipairs(opts.filter.filetype) do
+    _filter.filetype[#_filter.filetype + 1] = value
+  end
+
+  config.opts.filter = _filter
+  config.opts.symbol = opts.symbol or config.opts.symbol
+end
+
 ---@param bufnr integer
+---@return boolean
 local filter = function(bufnr)
   local filter = config.opts.filter
-  local filetype, buftype = {}, {}
+  local filetype, buftype = {}, {} ---@type boolean[], boolean[]
 
   for _, value in ipairs(filter.filetype) do
     filetype[value] = true
@@ -142,7 +168,8 @@ M.cache = nil ---@type simpleindent.cache[]
 
 ---@param opts simpleindent.opts?
 M.setup = function(opts)
-  config.opts = vim.tbl_deep_extend("force", config.default, opts or {})
+  setup_opts(opts)
+
   ns = vim.api.nvim_create_namespace("simpleindent")
   M.cache = {}
 
