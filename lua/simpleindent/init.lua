@@ -25,7 +25,7 @@ local setup_opts = function(opts)
 
   config.opts = {}
   config.opts.filter = _filter
-  config.opts.symbol = opts.symbol or config.opts.symbol
+  config.opts.symbol = opts.symbol or config.default.symbol
 end
 
 ---@param bufnr integer
