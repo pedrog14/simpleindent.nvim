@@ -23,6 +23,7 @@ local setup_opts = function(opts)
     _filter.filetype[#_filter.filetype + 1] = value
   end
 
+  config.opts = {}
   config.opts.filter = _filter
   config.opts.symbol = opts.symbol or config.opts.symbol
 end
