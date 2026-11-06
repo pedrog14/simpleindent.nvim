@@ -12,14 +12,14 @@ local setup_opts = function(opts)
   for _, value in ipairs(default.filter.buftype) do
     _filter.buftype[#_filter.buftype + 1] = value
   end
-  for _, value in ipairs(opts.filter.buftype) do
+  for _, value in ipairs(vim.tbl_get(opts, "filter", "buftype") or {}) do
     _filter.buftype[#_filter.buftype + 1] = value
   end
 
   for _, value in ipairs(default.filter.filetype) do
     _filter.filetype[#_filter.filetype + 1] = value
   end
-  for _, value in ipairs(opts.filter.filetype) do
+  for _, value in ipairs(vim.tbl_get(opts, "filter", "filetype") or {}) do
     _filter.filetype[#_filter.filetype + 1] = value
   end
 
